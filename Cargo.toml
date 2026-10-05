@@ -1,0 +1,22 @@
+[workspace]
+resolver = "3"
+members = ["crates/lanshare-proto", "crates/lanshare-wasm", "crates/lanshare"]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2024"
+publish = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+# 开发构建里，依赖库（加密、HTTP）也开优化：自己的代码照样能调试，测试不用等慢吞吞的未优化加密
+[profile.dev.package."*"]
+opt-level = 3
+
+# 加密库是泛型代码，在调用它的 crate 里才实例化、按调用方的优化级别编译：只优化依赖不够，协议 crate 也要优化
+[profile.dev.package.lanshare-proto]
+opt-level = 3

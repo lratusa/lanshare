@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>局域网快传</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="mobile">
+<svg class="sprite" aria-hidden="true">
+  <defs>
+    <symbol id="logo" viewBox="0 0 64 64">
+      <rect x="2" y="2" width="60" height="60" rx="14" fill="#2563eb"/>
+      <path d="M23 13 L13 29 H19.5 V51 H26.5 V29 H33 Z M41 51 L51 35 H44.5 V13 H37.5 V35 H31 Z" fill="#fff"/>
+    </symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><path d="M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 19V7M7 12l5-5 5 5M5 4h14"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  </defs>
+</svg>
+
+<div id="offline" class="offline-bar" hidden>连不上电脑上的局域网快传，正在重试…</div>
+<div id="booting" class="booting">正在建立加密连接…</div>
+
+<div class="login-wrap" id="waiting" hidden>
+  <section class="card login">
+    <svg class="logo"><use href="#logo"/></svg>
+    <h1>等电脑上点“允许”</h1>
+    <p class="muted">这台设备第一次连上来，要在电脑上的局域网快传窗口里点“允许”。</p>
+    <p class="pin" id="waitCode">····</p>
+    <p class="muted">核对一下：电脑上那一条的验证码，也应该是这 4 位数字。</p>
+    <p class="muted" id="waitBusy" hidden>电脑上等确认的设备太多了，稍等一下。</p>
+  </section>
+</div>
+
+<div class="login-wrap" id="login" hidden>
+  <section class="card login">
+    <svg class="logo"><use href="#logo"/></svg>
+    <h1>局域网快传</h1>
+    <p class="muted">用手机相机扫电脑上的二维码即可进入。<br>不方便扫码时，输入电脑上显示的 6 位口令。</p>
+    <form id="loginForm">
+      <input id="pinInput" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="口令">
+      <button class="btn" type="submit" id="loginBtn">进入</button>
+    </form>
+    <p id="loginMsg" class="err"></p>
+    <p class="secure-note"><svg class="i"><use href="#i-lock"/></svg>口令不会在网络上传输，抓包也看不到</p>
+  </section>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <svg class="logo"><use href="#logo"/></svg>
+    <span class="brand">局域网快传</span>
+    <span class="chip secure" title="文件和文字在发出前就在本机加密；密钥的明文只在二维码里，不经过网络"><svg class="i"><use href="#i-lock"/></svg>端到端加密</span>
+    <span class="chip status"><span class="dot"></span><span id="chipText">已连接</span></span>
+  </header>
+
+  <main>
+    <div class="col">
+      <section class="card" id="approvals" hidden>
+        <div class="card-head"><h2>有新设备想连接</h2></div>
+        <p class="muted">先核对验证码：和那台设备屏幕上的一样，再点“允许”。不认识的设备，点“拒绝”。</p>
+        <ul id="approvalList" class="files"></ul>
+      </section>
+
+      <section class="card" id="upload">
+        <label id="drop" class="drop">
+          <input id="picker" class="visually-hidden" type="file" multiple>
+          <span class="drop-icon"><svg class="i"><use href="#i-upload"/></svg></span>
+          <span>
+            <span class="drop-title" id="dropTitle">选择文件发送</span><br>
+            <span class="muted" id="dropHint">可以多选，照片、视频、文档都行</span>
+          </span>
+        </label>
+        <ul id="queue" class="uploads"></ul>
+      </section>
+
+      <section class="card" id="files">
+        <div class="card-head">
+          <h2>共享文件</h2><span class="count" id="fileCount"></span>
+          <button class="ghost head-btn" id="openFolder" type="button" hidden><svg class="i"><use href="#i-folder"/></svg>打开文件夹</button>
+        </div>
+        <ul id="fileList" class="files"></ul>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card" id="connect">
+        <details class="connect-fold" id="connectFold">
+          <summary id="connectTitle">让其他设备也连上来</summary>
+          <div class="qr"><img id="qr" alt="连接二维码"></div>
+          <div class="conn-row"><span class="muted">地址</span><b id="url"></b></div>
+          <div class="conn-row"><span class="muted">口令</span><span id="pin" class="pin"></span></div>
+          <div class="pin-paused" id="pinPaused" hidden>
+            <p>有人连续输错口令太多次，口令登录已暂停（扫码不受影响）。</p>
+            <button class="ghost" id="pinResume" type="button">重新开启口令登录</button>
+          </div>
+          <p class="secure-note"><svg class="i"><use href="#i-lock"/></svg>二维码里带着密钥，只让信任的人扫</p>
+          <details class="tips">
+            <summary>手机连不上？</summary>
+            <ul>
+              <li>手机和电脑要连同一个 WiFi（别用流量，也别连访客网络）。</li>
+              <li>扫码后打不开时，检查电脑的防火墙是否允许“局域网快传”。</li>
+              <li id="others" hidden></li>
+            </ul>
+          </details>
+          <p class="muted tray-note" id="trayNote" hidden>关掉这个窗口不会退出：程序在屏幕右下角的托盘里继续运行，右键托盘图标可以退出。</p>
+        </details>
+      </section>
+
+      <section class="card" id="texts">
+        <div class="card-head"><h2>文字</h2></div>
+        <div class="composer">
+          <textarea id="textInput" rows="2" placeholder="输入或粘贴文字，发给所有设备"></textarea>
+          <button class="btn" id="sendText" type="button">发送</button>
+        </div>
+        <ul id="textList" class="msgs"></ul>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div id="overlay" class="overlay" hidden><div class="overlay-box">松开鼠标，发送给所有设备</div></div>
+<div id="toast" class="toast" role="status"></div>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

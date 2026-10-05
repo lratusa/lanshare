@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+.venv/
+.venv-build/
+
+target/
+
+# 教程网页（tools/build_tutorial.py 生成）
+docs/learn-rust/site/

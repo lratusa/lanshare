@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>局域网快传</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+  :root {
+    --bg: #f3f5f9; --card: #ffffff; --text: #111827; --muted: #6b7280; --faint: #9ca3af;
+    --line: #e7eaf0; --soft: #f6f8fb; --accent: #2563eb; --accent-2: #4f46e5; --accent-soft: #eaf1ff;
+    --ok: #16a34a; --err: #dc2626; --warn-bg: #fff7e6; --warn-text: #92400e;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 4px 16px rgba(16, 24, 40, .06);
+    --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --card: #171a21; --text: #e8eaee; --muted: #9aa3b2; --faint: #6b7385;
+      --line: #252a34; --soft: #1d212a; --accent: #5b8cff; --accent-2: #7c6cff; --accent-soft: #1d2740;
+      --ok: #4ade80; --err: #f87171; --warn-bg: #3a2a0c; --warn-text: #fcd34d;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    }
+  }
+  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "PingFang SC",
+      "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- 顶栏 ---------- */
+  .top {
+    max-width: 1160px; margin: 0 auto; padding: 18px 20px 6px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo { width: 34px; height: 34px; flex: none; }
+  .brand { font-size: 18px; font-weight: 650; letter-spacing: .2px; }
+  .chip {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+    border-radius: 999px; background: var(--card); box-shadow: var(--shadow); font-size: 12.5px; color: var(--muted);
+    white-space: nowrap;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .offline-bar {
+    position: sticky; top: 0; z-index: 20; padding: 10px 16px; text-align: center; font-size: 14px;
+    background: var(--warn-bg); color: var(--warn-text);
+  }
+
+  /* ---------- 布局 ---------- */
+  main {
+    max-width: 1160px; margin: 0 auto; padding: 12px 20px 40px;
+    display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr);
+  }
+  .col { display: grid; gap: 16px; align-content: start; min-width: 0; }
+  /* 手机上拆掉两栏，按“发送 → 文件 → 文字 → 连接”排 */
+  body.mobile .col { display: contents; }
+  body.mobile #upload { order: 1; }
+  body.mobile #files { order: 2; }
+  body.mobile #texts { order: 3; }
+  body.mobile #connect { order: 4; }
+  body.desktop main { grid-template-columns: minmax(0, 1fr) 320px; }
+  @media (max-width: 760px) { body.desktop main { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; min-width: 0; }
+  .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .card-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
+  .count { color: var(--faint); font-size: 13px; }
+  .muted { color: var(--muted); font-size: 13px; }
+
+  /* ---------- 按钮 ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; cursor: pointer;
+    border-radius: 10px; padding: 9px 16px; font-weight: 600; font-size: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+    transition: transform .08s ease, filter .15s ease;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: scale(.98); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .ghost {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); cursor: pointer;
+    background: transparent; color: var(--muted); border-radius: 9px; padding: 5px 10px; font-size: 13px;
+  }
+  .ghost:hover { color: var(--accent); border-color: var(--accent); }
+  .head-btn { margin-left: auto; }
+
+  /* ---------- 发送文件 ---------- */
+  .drop {
+    position: relative; display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 22px; border: 1.5px dashed var(--line); border-radius: 14px; background: var(--soft);
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .drop:hover { border-color: var(--accent); }
+  .drop-icon {
+    width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .drop-icon svg.i { width: 22px; height: 22px; }
+  .drop-title { font-weight: 600; }
+  body.mobile .drop { flex-direction: column; text-align: center; padding: 28px 18px; }
+  body.mobile .drop-icon { width: 56px; height: 56px; border-radius: 16px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+
+  .uploads { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+  .uploads:empty { display: none; }
+  .up { padding: 10px 12px; border-radius: 12px; background: var(--soft); }
+  .up-row { display: flex; gap: 10px; align-items: baseline; }
+  .up-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  .up-status { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .bar { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 8px; }
+  .fill { height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    transition: width .2s ease; }
+  .up.done .fill { background: var(--ok); }
+  .up.done .up-status { color: var(--ok); }
+  .up.failed .fill { background: var(--err); }
+  .up.failed .up-status { color: var(--err); white-space: normal; }
+
+  /* ---------- 文件列表 ---------- */
+  .files { list-style: none; margin: 0; padding: 0; }
+  .file {
+    display: flex; align-items: center; gap: 12px; padding: 10px 8px; margin: 0 -8px; border-radius: 12px;
+    color: inherit; text-decoration: none; cursor: pointer;
+  }
+  .file:hover { background: var(--soft); }
+  .badge {
+    width: 40px; height: 40px; border-radius: 10px; flex: none; display: grid; place-items: center;
+    color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .3px;
+  }
+  .file-main { flex: 1; min-width: 0; }
+  .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .file-meta { font-size: 12.5px; color: var(--faint); }
+  .file-act { color: var(--faint); }
+  .file:hover .file-act { color: var(--accent); }
+  .empty { padding: 26px 8px; text-align: center; color: var(--faint); font-size: 14px; }
+
+  /* ---------- 文字 ---------- */
+  .composer { display: flex; gap: 8px; align-items: flex-end; }
+  textarea {
+    flex: 1; min-height: 44px; max-height: 160px; resize: vertical; padding: 10px 12px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--soft); outline: none;
+  }
+  textarea:focus { border-color: var(--accent); }
+  .msgs { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+  .msgs:empty { display: none; }
+  .msg { padding: 10px 12px; border-radius: 12px; background: var(--soft); }
+  .msg-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; }
+  .msg-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+  .msg-time { font-size: 12px; color: var(--faint); }
+
+  /* ---------- 连接 ---------- */
+  .qr { width: 200px; height: 200px; margin: 4px auto 14px; padding: 12px; border-radius: 16px; background: #fff;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06); }
+  .qr img { width: 100%; height: 100%; display: block; }
+  .conn-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0;
+    border-top: 1px solid var(--line); font-size: 14px; }
+  .conn-row b { font-weight: 600; overflow-wrap: anywhere; text-align: right; }
+  .pin { font-size: 22px; font-weight: 700; letter-spacing: 4px; font-variant-numeric: tabular-nums; }
+  details.tips { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  details.tips summary { cursor: pointer; color: var(--accent); list-style: none; }
+  details.tips ul { margin: 8px 0 0; padding-left: 18px; }
+  details.tips li { margin: 3px 0; }
+  details.connect-fold > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px;
+    font-weight: 650; }
+  details.connect-fold > summary::-webkit-details-marker, details.tips summary::-webkit-details-marker { display: none; }
+  details.connect-fold[open] > summary { margin-bottom: 12px; }
+
+  /* ---------- 口令页 ---------- */
+  .login-wrap { min-height: 80vh; display: grid; place-items: center; padding: 20px; }
+  .login { width: 100%; max-width: 360px; text-align: center; padding: 30px 24px; }
+  .login .logo { width: 56px; height: 56px; margin: 0 auto 12px; display: block; }
+  .login h1 { font-size: 20px; margin: 0 0 6px; }
+  .login form { display: grid; gap: 12px; margin-top: 18px; }
+  .login input {
+    width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--soft);
+    text-align: center; font-size: 26px; letter-spacing: 10px; font-variant-numeric: tabular-nums; outline: none;
+  }
+  .login input:focus { border-color: var(--accent); }
+  .login .btn { padding: 12px; font-size: 15px; }
+  .err { color: var(--err); min-height: 1.4em; margin: 10px 0 0; font-size: 14px; }
+
+  /* ---------- 拖放遮罩 / 提示 ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; pointer-events: none;
+    background: rgba(37, 99, 235, .12); backdrop-filter: blur(2px);
+  }
+  .overlay-box {
+    padding: 28px 40px; border-radius: 20px; border: 2px dashed var(--accent); background: var(--card);
+    box-shadow: var(--shadow); font-size: 17px; font-weight: 600; color: var(--accent);
+  }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 40;
+    transform: translateX(-50%) translateY(10px); opacity: 0; pointer-events: none;
+    padding: 9px 16px; border-radius: 999px; background: rgba(17, 24, 39, .92); color: #fff; font-size: 14px;
+    transition: opacity .2s, transform .2s; max-width: calc(100vw - 32px); text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body class="mobile">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="logo" viewBox="0 0 64 64">
+      <rect x="2" y="2" width="60" height="60" rx="14" fill="#2563eb"/>
+      <path d="M23 13 L13 29 H19.5 V51 H26.5 V29 H33 Z M41 51 L51 35 H44.5 V13 H37.5 V35 H31 Z" fill="#fff"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="offline" class="offline-bar" hidden>连不上电脑上的局域网快传，正在重试…</div>
+
+<div class="login-wrap" id="login" hidden>
+  <section class="card login">
+    <svg class="logo"><use href="#logo"/></svg>
+    <h1>局域网快传</h1>
+    <p class="muted">输入电脑上显示的 6 位口令。<br>用手机相机扫电脑上的二维码可以免输入。</p>
+    <form id="loginForm">
+      <input id="pinInput" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="口令">
+      <button class="btn" type="submit">进入</button>
+    </form>
+    <p id="loginMsg" class="err"></p>
+  </section>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <svg class="logo"><use href="#logo"/></svg>
+    <span class="brand">局域网快传</span>
+    <span class="chip"><span class="dot"></span><span id="chipText">已连接</span></span>
+  </header>
+
+  <main>
+    <div class="col">
+      <section class="card" id="upload">
+        <label id="drop" class="drop">
+          <input id="picker" class="visually-hidden" type="file" multiple>
+          <span class="drop-icon"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V7M7 12l5-5 5 5M5 4h14"/></svg></span>
+          <span>
+            <span class="drop-title" id="dropTitle">选择文件发送</span><br>
+            <span class="muted" id="dropHint">可以多选，照片、视频、文档都行</span>
+          </span>
+        </label>
+        <ul id="queue" class="uploads"></ul>
+      </section>
+
+      <section class="card" id="files">
+        <div class="card-head">
+          <h2>共享文件</h2><span class="count" id="fileCount"></span>
+          <button class="ghost head-btn" id="openFolder" type="button" hidden>
+            <svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>打开文件夹
+          </button>
+        </div>
+        <ul id="fileList" class="files"></ul>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card" id="connect">
+        <details class="connect-fold" id="connectFold">
+          <summary id="connectTitle">让其他设备也连上来</summary>
+          <div class="qr"><img id="qr" alt="连接二维码"></div>
+          <div class="conn-row"><span class="muted">地址</span><b id="url"></b></div>
+          <div class="conn-row"><span class="muted">口令</span><span id="pin" class="pin"></span></div>
+          <details class="tips">
+            <summary>手机连不上？</summary>
+            <ul>
+              <li>手机和电脑要连同一个 WiFi（别用流量，也别连访客网络）。</li>
+              <li>Windows 里这个网络要设成“专用网络”。</li>
+              <li id="others" hidden></li>
+            </ul>
+          </details>
+        </details>
+      </section>
+
+      <section class="card" id="texts">
+        <div class="card-head"><h2>文字</h2></div>
+        <div class="composer">
+          <textarea id="textInput" rows="1" placeholder="输入或粘贴文字，发给所有设备"></textarea>
+          <button class="btn" id="sendText" type="button">发送</button>
+        </div>
+        <ul id="textList" class="msgs"></ul>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div id="overlay" class="overlay" hidden><div class="overlay-box">松开鼠标，发送给所有设备</div></div>
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const SVG_NS = "http://www.w3.org/2000/svg";
+const ICONS = {
+  download: "M12 4v11M7 10l5 5 5-5M5 20h14",
+  folder: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
+  copy: "M9 9h10v10H9zM5 15V5h10",
+};
+const TYPES = [
+  [["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "svg", "tif", "tiff", "raw", "dng"], "#10b981"],
+  [["mp4", "mov", "avi", "mkv", "webm", "m4v", "3gp", "wmv", "flv"], "#8b5cf6"],
+  [["mp3", "wav", "m4a", "flac", "aac", "ogg", "wma", "amr"], "#f59e0b"],
+  [["pdf"], "#ef4444"],
+  [["doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "csv", "rtf", "pages", "numbers", "key"], "#3b82f6"],
+  [["zip", "rar", "7z", "tar", "gz", "bz2", "xz"], "#64748b"],
+  [["apk", "exe", "msi", "dmg", "ipa"], "#0ea5e9"],
+];
+
+let isDesktop = false;
+let pollTimer = null;
+let failures = 0;
+let lastFilesKey = "";
+let lastTextsKey = "";
+const queue = [];
+let uploading = false;
+
+class Unauthorized extends Error {}
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function icon(name) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "i");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", ICONS[name]);
+  svg.appendChild(path);
+  return svg;
+}
+
+function fmtSize(n) {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return (i === 0 ? String(Math.round(n)) : n.toFixed(1)) + " " + units[i];
+}
+
+function fmtTime(seconds) {
+  const d = new Date(seconds * 1000);
+  const pad = (x) => String(x).padStart(2, "0");
+  const hm = pad(d.getHours()) + ":" + pad(d.getMinutes());
+  if (d.toDateString() === new Date().toDateString()) return hm;
+  return (d.getMonth() + 1) + "月" + d.getDate() + "日 " + hm;
+}
+
+function badgeFor(name) {
+  const dot = name.lastIndexOf(".");
+  const ext = dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
+  let color = "#94a3b8";
+  for (const [exts, c] of TYPES) if (exts.includes(ext)) { color = c; break; }
+  const badge = el("span", "badge", ext ? ext.slice(0, 4).toUpperCase() : "FILE");
+  badge.style.background = color;
+  return badge;
+}
+
+let toastTimer = null;
+function toast(text) {
+  const t = $("toast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+async function api(path, options) {
+  const res = await fetch(path, Object.assign({ cache: "no-store", credentials: "same-origin" }, options));
+  if (res.status === 401) { showLogin(); throw new Unauthorized(); }
+  return res;
+}
+
+function postJSON(path, body) {
+  return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+}
+
+// ---------- 登录 ----------
+
+function showLogin(message) {
+  stopPolling();
+  lastFilesKey = "";
+  lastTextsKey = "";
+  $("offline").hidden = true;
+  $("app").hidden = true;
+  $("login").hidden = false;
+  $("loginMsg").textContent = message || "";
+}
+
+async function enterApp() {
+  try {
+    await loadInfo();
+  } catch (e) {
+    if (!(e instanceof Unauthorized)) showLogin("连不上电脑上的程序，请确认它还在运行");
+    return;
+  }
+  $("login").hidden = true;
+  $("app").hidden = false;
+  refresh();
+  startPolling();
+}
+
+async function loadInfo() {
+  const info = await (await api("/api/info")).json();
+  isDesktop = !!info.local;
+  document.body.classList.toggle("desktop", isDesktop);
+  document.body.classList.toggle("mobile", !isDesktop);
+  $("url").textContent = info.urls[0].replace(/\/$/, "");
+  $("pin").textContent = info.pin;
+  const others = info.urls.slice(1).map((u) => u.replace(/\/$/, ""));
+  $("others").hidden = others.length === 0;
+  $("others").textContent = "扫码地址打不开时，在手机浏览器里试试：" + others.join("、");
+  $("qr").src = "/qr.svg?t=" + Date.now();
+  $("connectFold").open = isDesktop;
+  $("connectTitle").textContent = isDesktop ? "用手机扫码连接" : "让其他设备也连上来";
+  $("openFolder").hidden = !isDesktop;
+  $("chipText").textContent = isDesktop ? "运行中 · " + $("url").textContent.replace("http://", "") : "已连接";
+  $("dropTitle").textContent = isDesktop ? "把文件拖到窗口里，或点这里选择" : "选择文件发送";
+  $("dropHint").textContent = isDesktop ? "所有连上的手机、电脑都能下载" : "可以多选，照片、视频、文档都行";
+}
+
+$("loginForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const pin = $("pinInput").value.trim();
+  if (!pin) return;
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin: pin }),
+    });
+    if (res.ok) {
+      $("pinInput").value = "";
+      enterApp();
+    } else if (res.status === 429) {
+      $("loginMsg").textContent = "输错次数太多，请 1 分钟后再试";
+    } else {
+      $("loginMsg").textContent = "口令不对，请看电脑上显示的 6 位数字";
+    }
+  } catch (e) {
+    $("loginMsg").textContent = "连不上电脑上的程序，请确认它还在运行";
+  }
+});
+
+// ---------- 轮询 ----------
+
+function startPolling() {
+  stopPolling();
+  pollTimer = setInterval(() => { if (!document.hidden) refresh(); }, 2000);
+}
+
+function stopPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && pollTimer) refresh();
+});
+
+async function refresh() {
+  try {
+    const responses = await Promise.all([api("/api/files"), api("/api/text")]);
+    renderFiles(await responses[0].json());
+    renderTexts(await responses[1].json());
+    failures = 0;
+    $("offline").hidden = true;
+  } catch (e) {
+    if (e instanceof Unauthorized) return;  // 已切回口令页
+    failures += 1;
+    if (failures >= 2) $("offline").hidden = false;
+  }
+}
+
+// ---------- 文件列表 ----------
+
+function renderFiles(files) {
+  const key = JSON.stringify(files) + isDesktop;
+  if (key === lastFilesKey) return;
+  lastFilesKey = key;
+  $("fileCount").textContent = files.length ? files.length + " 个" : "";
+  const list = $("fileList");
+  list.textContent = "";
+  if (files.length === 0) {
+    list.appendChild(el("li", "empty", "还没有文件。从任何一台设备发送的文件都会出现在这里。"));
+    return;
+  }
+  for (const f of files) {
+    const li = el("li");
+    const row = el("a", "file");
+    row.appendChild(badgeFor(f.name));
+    const main = el("span", "file-main");
+    main.appendChild(el("div", "file-name", f.name));
+    main.appendChild(el("div", "file-meta", fmtSize(f.size) + " · " + fmtTime(f.mtime)));
+    row.appendChild(main);
+    const act = el("span", "file-act");
+    act.appendChild(icon(isDesktop ? "folder" : "download"));
+    row.appendChild(act);
+    if (isDesktop) {
+      row.title = "在文件夹中显示";
+      row.href = "#";
+      row.addEventListener("click", (event) => {
+        event.preventDefault();
+        postJSON("/api/reveal", { name: f.name }).catch(() => {});
+      });
+    } else {
+      row.href = "/api/files/" + encodeURIComponent(f.name);
+      row.setAttribute("download", f.name);
+    }
+    li.appendChild(row);
+    list.appendChild(li);
+  }
+}
+
+$("openFolder").addEventListener("click", () => { postJSON("/api/open-folder", {}).catch(() => {}); });
+
+// ---------- 文字 ----------
+
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* 回退到下面的办法 */ }
+  }
+  // 手机用 http://局域网IP 访问不是“安全上下文”，没有 navigator.clipboard
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.top = "-1000px";
+  document.body.appendChild(area);
+  area.select();
+  area.setSelectionRange(0, text.length);
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  document.body.removeChild(area);
+  return ok;
+}
+
+function renderTexts(items) {
+  const key = JSON.stringify(items);
+  if (key === lastTextsKey) return;
+  lastTextsKey = key;
+  const list = $("textList");
+  list.textContent = "";
+  for (const m of items) {
+    const li = el("li", "msg");
+    li.appendChild(el("div", "msg-text", m.text));
+    const bar = el("div", "msg-bar");
+    bar.appendChild(el("span", "msg-time", fmtTime(m.time)));
+    const button = el("button", "ghost");
+    button.type = "button";
+    button.appendChild(icon("copy"));
+    button.appendChild(document.createTextNode("复制"));
+    button.addEventListener("click", async () => {
+      toast((await copyText(m.text)) ? "已复制" : "复制失败，请长按文字手动复制");
+    });
+    bar.appendChild(button);
+    li.appendChild(bar);
+    list.appendChild(li);
+  }
+}
+
+async function sendText() {
+  const input = $("textInput");
+  const text = input.value;
+  if (!text.trim()) return;
+  const button = $("sendText");
+  button.disabled = true;
+  try {
+    const res = await postJSON("/api/text", { text: text });
+    if (res.ok) {
+      input.value = "";
+      refresh();
+    } else {
+      toast(res.status === 400 ? "文字太长了（最多 10000 字）" : "发送失败（" + res.status + "）");
+    }
+  } catch (e) {
+    if (!(e instanceof Unauthorized)) toast("发送失败，请检查网络");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("sendText").addEventListener("click", sendText);
+$("textInput").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    sendText();
+  }
+});
+
+// ---------- 上传 ----------
+
+function addFiles(fileList) {
+  for (const file of Array.from(fileList)) {
+    const li = el("li", "up");
+    const row = el("div", "up-row");
+    row.appendChild(el("span", "up-name", file.name));
+    const status = el("span", "up-status", "等待中 · " + fmtSize(file.size));
+    row.appendChild(status);
+    const bar = el("div", "bar");
+    const fill = el("div", "fill");
+    bar.appendChild(fill);
+    li.appendChild(row);
+    li.appendChild(bar);
+    $("queue").prepend(li);
+    queue.push({ file: file, li: li, fill: fill, status: status });
+  }
+  pump();
+}
+
+function pump() {
+  if (uploading || queue.length === 0) return;
+  uploading = true;
+  const job = queue.shift();
+  uploadOne(job).then(() => {
+    uploading = false;
+    pump();
+  });
+}
+
+function failJob(job, message) {
+  job.li.classList.add("failed");
+  job.status.textContent = message;
+}
+
+function uploadOne(job) {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    const started = performance.now();
+    const elapsed = () => Math.max((performance.now() - started) / 1000, 0.001);
+    xhr.open("PUT", "/api/files/" + encodeURIComponent(job.file.name));
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || event.total === 0) return;
+      const pct = (event.loaded / event.total) * 100;
+      job.fill.style.width = pct.toFixed(1) + "%";
+      job.status.textContent = pct.toFixed(0) + "% · " + fmtSize(event.loaded / elapsed()) + "/s";
+    };
+    xhr.onload = () => {
+      if (xhr.status === 201) {
+        let saved = job.file.name;
+        try { saved = JSON.parse(xhr.responseText).name; } catch (e) { /* 用原名 */ }
+        job.li.classList.add("done");
+        job.fill.style.width = "100%";
+        job.status.textContent = "已发送 · " + fmtSize(job.file.size / elapsed()) + "/s";
+        if (saved !== job.file.name) toast("有同名文件，已存为 " + saved);
+        setTimeout(() => job.li.remove(), 6000);
+        refresh();
+      } else if (xhr.status === 401) {
+        failJob(job, "口令失效了，请重新输入口令后再传");
+        while (queue.length) failJob(queue.shift(), "已取消");
+        showLogin();
+      } else if (xhr.status === 507) {
+        failJob(job, "电脑磁盘空间不足");
+      } else {
+        failJob(job, "发送失败（" + xhr.status + "）");
+      }
+      resolve();
+    };
+    xhr.onerror = () => {
+      failJob(job, "网络中断，请重试");
+      resolve();
+    };
+    xhr.send(job.file);
+  });
+}
+
+$("picker").addEventListener("change", () => {
+  addFiles($("picker").files);
+  $("picker").value = "";
+});
+
+// 拖放：整个窗口都能接文件；拖到别处时也别让浏览器直接打开文件
+let dragDepth = 0;
+const hasFiles = (event) => event.dataTransfer && Array.from(event.dataTransfer.types || []).includes("Files");
+window.addEventListener("dragenter", (event) => {
+  if (!hasFiles(event) || $("app").hidden) return;
+  event.preventDefault();
+  dragDepth += 1;
+  $("overlay").hidden = false;
+});
+window.addEventListener("dragleave", () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) $("overlay").hidden = true;
+});
+window.addEventListener("dragover", (event) => event.preventDefault());
+window.addEventListener("drop", (event) => {
+  event.preventDefault();
+  dragDepth = 0;
+  $("overlay").hidden = true;
+  if (!$("app").hidden && event.dataTransfer && event.dataTransfer.files.length) addFiles(event.dataTransfer.files);
+});
+
+window.addEventListener("beforeunload", (event) => {
+  if (uploading || queue.length) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+
+enterApp();
+</script>
+</body>
+</html>
